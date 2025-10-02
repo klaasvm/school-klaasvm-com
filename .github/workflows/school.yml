@@ -1,0 +1,53 @@
+name: Create Account JSON
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  create-account:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: true
+      - name: Check if account.json exists
+        id: check-file
+        run: |
+          if [ -f "account.json" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+        fi
+      - name: Create account.json
+        if: steps.check-file.outputs.exists == 'false'
+        run: |
+          USERNAME="${{ github.repository_owner }}"
+          cat > account.json << 'EOF'
+                {
+                  "account": true,
+                  "name": "${{ github.repository_owner }}"
+                }
+          EOF
+        echo "Created account.json with username: $USERNAME"
+      - name: Commit changes
+        if: steps.check-file.outputs.exists == 'false'
+        run: |
+          git config --global user.email "action@github.com"
+          git config --global user.name "GitHub Action"
+          git add account.json
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "🤖 Auto-create account.json for ${{ github.repository_owner }}"
+            git push origin ${{ github.ref_name }}
+        fi
